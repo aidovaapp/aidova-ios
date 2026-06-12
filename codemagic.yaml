@@ -29,10 +29,10 @@ workflows:
           keychain initialize
       - name: Generate private key and create certificate
         script: |
-          openssl genrsa -out /tmp/private_key.pem 2048
+          openssl genrsa -out /tmp/cert_key.pem 2048
           app-store-connect certificates create \
             --type IOS_DISTRIBUTION \
-            --private-key /tmp/private_key.pem \
+            --certificate-key @file:/tmp/cert_key.pem \
             --save
       - name: Fetch or create provisioning profile
         script: |
