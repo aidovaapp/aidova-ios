@@ -3,13 +3,14 @@ workflows:
     name: Aidova iOS Build
     max_build_duration: 60
     instance_type: mac_mini_m2
+    working_directory: "Aidova AAC- IOS/src"
     environment:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: app.aidova.aac
       vars:
-        XCODE_WORKSPACE: "App.xcworkspace"
-        XCODE_SCHEME: "App"
+        XCODE_WORKSPACE: "Aidova AAC.xcworkspace"
+        XCODE_SCHEME: "Aidova AAC"
       xcode: latest
       cocoapods: default
     triggering:
@@ -22,20 +23,17 @@ workflows:
     scripts:
       - name: Install CocoaPods dependencies
         script: |
-          find . -name "Podfile" -maxdepth 3
-          cd $(dirname $(find . -name "Podfile" -maxdepth 3 | head -1))
           pod install
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
       - name: Increment build number
         script: |
-          cd $(dirname $(find . -name "*.xcodeproj" -maxdepth 3 | head -1))
           agvtool new-version -all $(($BUILD_NUMBER + 1))
       - name: Build ipa for distribution
         script: |
           xcode-project build-ipa \
-            --workspace "$(find . -name "*.xcworkspace" -maxdepth 3 | head -1)" \
+            --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
