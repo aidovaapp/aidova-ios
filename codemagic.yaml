@@ -3,12 +3,15 @@ workflows:
     name: Aidova iOS Build
     max_build_duration: 60
     instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Aidova App Store Connect
     working_directory: "Aidova AAC- IOS/src"
     environment:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: app.aidova.aac
       vars:
+        BUNDLE_ID: "app.aidova.aac"
         XCODE_WORKSPACE: "Aidova AAC.xcworkspace"
         XCODE_SCHEME: "Aidova AAC"
       xcode: latest
@@ -24,6 +27,11 @@ workflows:
       - name: Install CocoaPods dependencies
         script: |
           pod install
+      - name: Fetch signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
@@ -39,3 +47,7 @@ workflows:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_app_store: false
