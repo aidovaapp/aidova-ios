@@ -7,9 +7,6 @@ workflows:
       app_store_connect: Aidova App Store Connect
     working_directory: "Aidova AAC- IOS/src"
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: app.aidova.aac
       vars:
         BUNDLE_ID: "app.aidova.aac"
         XCODE_WORKSPACE: "Aidova AAC.xcworkspace"
