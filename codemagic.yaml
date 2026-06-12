@@ -24,13 +24,16 @@ workflows:
       - name: Install CocoaPods dependencies
         script: |
           pod install
-      - name: Generate certificate and provisioning profile
+      - name: Initialize keychain
         script: |
           keychain initialize
+      - name: Fetch signing files
+        script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
-            --certificate-type IOS_DISTRIBUTION \
             --create
+      - name: Add certificates to keychain
+        script: |
           keychain add-certificates
       - name: Set up code signing settings on Xcode project
         script: |
