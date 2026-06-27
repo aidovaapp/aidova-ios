@@ -2,6 +2,7 @@ import UIKit
 import WebKit
 import AuthenticationServices
 import SafariServices
+import StoreKit
 
 
 func createWebView(container: UIView, WKSMH: WKScriptMessageHandler, WKND: WKNavigationDelegate, NSO: NSObject, VC: ViewController) -> WKWebView{
@@ -14,6 +15,11 @@ func createWebView(container: UIView, WKSMH: WKScriptMessageHandler, WKND: WKNav
     userContentController.add(WKSMH, name: "push-permission-request")
     userContentController.add(WKSMH, name: "push-permission-state")
     userContentController.add(WKSMH, name: "push-token")
+    
+    // StoreKit IAP bridge handlers
+    userContentController.add(WKSMH, name: "iap-purchase")
+    userContentController.add(WKSMH, name: "iap-restore")
+    userContentController.add(WKSMH, name: "iap-get-products")
 
     config.userContentController = userContentController
 
@@ -24,6 +30,9 @@ func createWebView(container: UIView, WKSMH: WKScriptMessageHandler, WKND: WKNav
     
     let webView = WKWebView(frame: calcWebviewFrame(webviewView: container, toolbarView: nil), configuration: config)
     setCustomCookie(webView: webView)
+    
+    // Give StoreKitManager a reference to the webView for JS bridge calls
+    StoreKitManager.shared.webView = webView
 
     webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     webView.isHidden = true;
@@ -32,8 +41,6 @@ func createWebView(container: UIView, WKSMH: WKScriptMessageHandler, WKND: WKNav
     webView.scrollView.contentInsetAdjustmentBehavior = .never
     webView.allowsBackForwardNavigationGestures = true
     
-    // Check if macCatalyst 16.4+ is available and if so, enable web inspector.
-    // This allows the web app to be inspected using Safari Web Inspector. Supported on iOS 16.4+ and macOS 13.3+
     if #available(iOS 16.4, macOS 13.3, *) {
         webView.isInspectable = true
     }
@@ -71,7 +78,6 @@ func setCustomCookie(webView: WKWebView) {
     ])!
 
     webView.configuration.websiteDataStore.httpCookieStore.setCookie(_platformCookie)
-
 }
 
 func calcWebviewFrame(webviewView: UIView, toolbarView: UIToolbar?) -> CGRect{
@@ -103,14 +109,13 @@ func calcWebviewFrame(webviewView: UIView, toolbarView: UIToolbar?) -> CGRect{
 }
 
 extension ViewController: WKUIDelegate, WKDownloadDelegate {
-    // redirect new tabs to main webview
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         if (navigationAction.targetFrame == nil) {
             webView.load(navigationAction.request)
         }
         return nil
     }
-    // restrict navigation to target host, open external links in 3rd party apps
+
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if (navigationAction.request.url?.scheme == "about") {
             return decisionHandler(.allow)
@@ -121,7 +126,6 @@ extension ViewController: WKUIDelegate, WKDownloadDelegate {
 
         if let requestUrl = navigationAction.request.url{
             if let requestHost = requestUrl.host {
-                // NOTE: Match auth origin first, because host origin may be a subset of auth origin and may therefore always match
                 let matchingAuthOrigin = authOrigins.first(where: { requestHost.range(of: $0) != nil })
                 if (matchingAuthOrigin != nil) {
                     decisionHandler(.allow)
@@ -134,7 +138,6 @@ extension ViewController: WKUIDelegate, WKDownloadDelegate {
 
                 let matchingHostOrigin = allowedOrigins.first(where: { requestHost.range(of: $0) != nil })
                 if (matchingHostOrigin != nil) {
-                    // Open in main webview
                     decisionHandler(.allow)
                     if (!toolbarView.isHidden) {
                         toolbarView.isHidden = true
@@ -145,7 +148,6 @@ extension ViewController: WKUIDelegate, WKDownloadDelegate {
                 if (navigationAction.navigationType == .other &&
                     navigationAction.value(forKey: "syntheticClickType") as! Int == 0 &&
                     (navigationAction.targetFrame != nil) &&
-                    // no error here, fake warning
                     (navigationAction.sourceFrame != nil)
                 ) {
                     decisionHandler(.allow)
@@ -155,13 +157,10 @@ extension ViewController: WKUIDelegate, WKDownloadDelegate {
                     decisionHandler(.cancel)
                 }
 
-
                 if ["http", "https"].contains(requestUrl.scheme?.lowercased() ?? "") {
-                    // Can open with SFSafariViewController
                     let safariViewController = SFSafariViewController(url: requestUrl)
                     self.present(safariViewController, animated: true, completion: nil)
                 } else {
-                    // Scheme is not supported or no scheme is given, use openURL
                     if (UIApplication.shared.canOpenURL(requestUrl)) {
                         UIApplication.shared.open(requestUrl)
                     }
@@ -175,180 +174,70 @@ extension ViewController: WKUIDelegate, WKDownloadDelegate {
                 }
                 else {
                     if requestUrl.isFileURL {
-                        // not tested
                         downloadAndOpenFile(url: requestUrl.absoluteURL)
                     }
-                    // if (requestUrl.absoluteString.contains("base64")){
-                    //     downloadAndOpenBase64File(base64String: requestUrl.absoluteString)
-                    // }
                 }
             }
         }
         else {
             decisionHandler(.cancel)
         }
-
     }
-    // Handle javascript: `window.alert(message: String)`
+
     func webView(_ webView: WKWebView,
         runJavaScriptAlertPanelWithMessage message: String,
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping () -> Void) {
-
-        // Set the message as the UIAlertController message
-        let alert = UIAlertController(
-            title: nil,
-            message: message,
-            preferredStyle: .alert
-        )
-
-        // Add a confirmation action “OK”
-        let okAction = UIAlertAction(
-            title: "OK",
-            style: .default,
-            handler: { _ in
-                // Call completionHandler
-                completionHandler()
-            }
-        )
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        let okAction = UIAlertAction(title: "OK", style: .default, handler: { _ in completionHandler() })
         alert.addAction(okAction)
-
-        // Display the NSAlert
         present(alert, animated: true, completion: nil)
     }
-    // Handle javascript: `window.confirm(message: String)`
+
     func webView(_ webView: WKWebView,
         runJavaScriptConfirmPanelWithMessage message: String,
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (Bool) -> Void) {
-
-        // Set the message as the UIAlertController message
-        let alert = UIAlertController(
-            title: nil,
-            message: message,
-            preferredStyle: .alert
-        )
-
-        // Add a confirmation action “Cancel”
-        let cancelAction = UIAlertAction(
-            title: "Cancel",
-            style: .cancel,
-            handler: { _ in
-                // Call completionHandler
-                completionHandler(false)
-            }
-        )
-
-        // Add a confirmation action “OK”
-        let okAction = UIAlertAction(
-            title: "OK",
-            style: .default,
-            handler: { _ in
-                // Call completionHandler
-                completionHandler(true)
-            }
-        )
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel, handler: { _ in completionHandler(false) })
+        let okAction = UIAlertAction(title: "OK", style: .default, handler: { _ in completionHandler(true) })
         alert.addAction(cancelAction)
         alert.addAction(okAction)
-
-        // Display the NSAlert
         present(alert, animated: true, completion: nil)
     }
-    // Handle javascript: `window.prompt(prompt: String, defaultText: String?)`
+
     func webView(_ webView: WKWebView,
         runJavaScriptTextInputPanelWithPrompt prompt: String,
         defaultText: String?,
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (String?) -> Void) {
-
-        // Set the message as the UIAlertController message
-        let alert = UIAlertController(
-            title: nil,
-            message: prompt,
-            preferredStyle: .alert
-        )
-
-        // Add a confirmation action “Cancel”
-        let cancelAction = UIAlertAction(
-            title: "Cancel",
-            style: .cancel,
-            handler: { _ in
-                // Call completionHandler
-                completionHandler(nil)
-            }
-        )
-
-        // Add a confirmation action “OK”
-        let okAction = UIAlertAction(
-            title: "OK",
-            style: .default,
-            handler: { _ in
-                // Call completionHandler with Alert input
-                if let input = alert.textFields?.first?.text {
-                    completionHandler(input)
-                }
-            }
-        )
-
-        alert.addTextField { textField in
-            textField.placeholder = defaultText
-        }
+        let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel, handler: { _ in completionHandler(nil) })
+        let okAction = UIAlertAction(title: "OK", style: .default, handler: { _ in
+            if let input = alert.textFields?.first?.text { completionHandler(input) }
+        })
+        alert.addTextField { textField in textField.placeholder = defaultText }
         alert.addAction(cancelAction)
         alert.addAction(okAction)
-
-        // Display the NSAlert
         present(alert, animated: true, completion: nil)
     }
 
     func downloadAndOpenFile(url: URL){
-
-        let destinationFileUrl = url
         let sessionConfig = URLSessionConfiguration.default
         let session = URLSession(configuration: sessionConfig)
         let request = URLRequest(url:url)
         let task = session.downloadTask(with: request) { (tempLocalUrl, response, error) in
             if let tempLocalUrl = tempLocalUrl, error == nil {
-                if let statusCode = (response as? HTTPURLResponse)?.statusCode {
-                    print("Successfully download. Status code: \(statusCode)")
-                }
                 do {
-                    try FileManager.default.copyItem(at: tempLocalUrl, to: destinationFileUrl)
-                    self.openFile(url: destinationFileUrl)
+                    try FileManager.default.copyItem(at: tempLocalUrl, to: url)
+                    self.openFile(url: url)
                 } catch (let writeError) {
-                    print("Error creating a file \(destinationFileUrl) : \(writeError)")
+                    print("Error creating a file \(url) : \(writeError)")
                 }
-            } else {
-                print("Error took place while downloading a file. Error description: \(error?.localizedDescription ?? "N/A") ")
             }
         }
         task.resume()
     }
-
-    // func downloadAndOpenBase64File(base64String: String) {
-    //     // Split the base64 string to extract the data and the file extension
-    //     let components = base64String.components(separatedBy: ";base64,")
-
-    //     // Make sure the base64 string has the correct format
-    //     guard components.count == 2, let format = components.first?.split(separator: "/").last else {
-    //         print("Invalid base64 string format")
-    //         return
-    //     }
-
-    //     // Remove the data type prefix to get the base64 data
-    //     let dataString = components.last!
-
-    //     if let imageData = Data(base64Encoded: dataString) {
-    //         let documentsUrl: URL  =  FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-    //         let destinationFileUrl = documentsUrl.appendingPathComponent("image.\(format)")
-
-    //         do {
-    //             try imageData.write(to: destinationFileUrl)
-    //             self.openFile(url: destinationFileUrl)
-    //         } catch {
-    //             print("Error writing image to file url: \(destinationFileUrl): \(error)")
-    //         }
-    //     }
-    // }
 
     func openFile(url: URL) {
         self.documentController = UIDocumentInteractionController(url: url)
@@ -363,15 +252,11 @@ extension ViewController: WKUIDelegate, WKDownloadDelegate {
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse,
                 suggestedFilename: String,
                 completionHandler: @escaping (URL?) -> Void) {
-
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let fileURL = documentsPath.appendingPathComponent(suggestedFilename)
-
-        // Remove existing file if it exists, otherwise it may show an old file/content just by having the same name.
         if FileManager.default.fileExists(atPath: fileURL.path) {
             try? FileManager.default.removeItem(at: fileURL)
         }
-
         self.openFile(url: fileURL)
         completionHandler(fileURL)
     }

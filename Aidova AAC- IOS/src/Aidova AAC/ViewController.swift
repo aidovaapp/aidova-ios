@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import StoreKit
 
 var webView: WKWebView! = nil
 
@@ -43,7 +44,6 @@ class ViewController: UIViewController, WKNavigationDelegate, UIDocumentInteract
         loadRootUrl()
     
         NotificationCenter.default.addObserver(self, selector: #selector(self.keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification , object: nil)
-        
     }
 
     override func viewDidLayoutSubviews() {
@@ -100,7 +100,6 @@ class ViewController: UIViewController, WKNavigationDelegate, UIDocumentInteract
         let toolbarView = UIToolbar(frame: CGRect(x: 0, y: 0, width: webviewView.frame.width, height: 0))
         toolbarView.sizeToFit()
         toolbarView.frame = CGRect(x: 0, y: 0, width: webviewView.frame.width, height: toolbarView.frame.height + statusBarHeight)
-//        toolbarView.autoresizingMask = [.flexibleTopMargin, .flexibleRightMargin, .flexibleWidth]
         
         let flex = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
         let close = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(loadRootUrl))
@@ -124,8 +123,7 @@ class ViewController: UIViewController, WKNavigationDelegate, UIDocumentInteract
     }
     
     func initToolbarView() {
-        toolbarView =  createToolbarView()
-        
+        toolbarView = createToolbarView()
         webviewView.addSubview(toolbarView)
     }
     
@@ -133,17 +131,13 @@ class ViewController: UIViewController, WKNavigationDelegate, UIDocumentInteract
         AidovaAAC.webView.load(URLRequest(url: SceneDelegate.universalLinkToLaunch ?? SceneDelegate.shortcutLinkToLaunch ?? rootUrl, cachePolicy: cachePolicy))
     }
     
-    func reloadWebview(
-        loadingMode: LoadingMode = LoadingMode.defaultCachePolicy
-    ) {
+    func reloadWebview(loadingMode: LoadingMode = LoadingMode.defaultCachePolicy) {
         switch loadingMode {
         case LoadingMode.defaultCachePolicy:
             loadRootUrl(cachePolicy: .useProtocolCachePolicy);
-
         case LoadingMode.forceCache:
             loadRootUrl(cachePolicy: .useProtocolCachePolicy);
         }
-
         self.loadingMode = loadingMode
     }
     
@@ -156,10 +150,14 @@ class ViewController: UIViewController, WKNavigationDelegate, UIDocumentInteract
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             AidovaAAC.webView.isHidden = false
             self.loadingView.isHidden = true
-           
             self.setProgress(0.0, false)
-            
             self.overrideUIStyle()
+            
+            // Check existing entitlements on every app launch
+            // This restores Premium automatically if user already subscribed
+            Task {
+                await StoreKitManager.shared.checkCurrentEntitlements()
+            }
         }
     }
     
@@ -191,16 +189,13 @@ class ViewController: UIViewController, WKNavigationDelegate, UIDocumentInteract
     }
     
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-
         if (keyPath == #keyPath(WKWebView.estimatedProgress) &&
                 AidovaAAC.webView.isLoading &&
                 !self.loadingView.isHidden &&
                 !self.htmlIsLoaded) {
                     var progress = Float(AidovaAAC.webView.estimatedProgress);
-                    
                     if (progress >= 0.8) { progress = 1.0; };
                     if (progress >= 0.3) { self.animateConnectionProblem(false); }
-                    
                     self.setProgress(progress, true);
         }
     }
@@ -208,7 +203,6 @@ class ViewController: UIViewController, WKNavigationDelegate, UIDocumentInteract
     func setProgress(_ progress: Float, _ animated: Bool) {
         self.progressView.setProgress(progress, animated: animated);
     }
-    
     
     func animateConnectionProblem(_ show: Bool) {
         if (show) {
@@ -220,7 +214,7 @@ class ViewController: UIViewController, WKNavigationDelegate, UIDocumentInteract
         }
         else {
             UIView.animate(withDuration: 0.3, delay: 0, options: [], animations: {
-                self.connectionProblemView.alpha = 0 // Here you will get the animation you want
+                self.connectionProblemView.alpha = 0
             }, completion: { _ in
                 self.connectionProblemView.isHidden = true;
                 self.connectionProblemView.layer.removeAllAnimations();
@@ -234,29 +228,20 @@ class ViewController: UIViewController, WKNavigationDelegate, UIDocumentInteract
 }
 
 extension UIColor {
-    // Check if the color is light or dark, as defined by the injected lightness threshold.
-    // Some people report that 0.7 is best. I suggest to find out for yourself.
-    // A nil value is returned if the lightness couldn't be determined.
     func isLight(threshold: Float = 0.5) -> Bool? {
         let originalCGColor = self.cgColor
-
-        // Now we need to convert it to the RGB colorspace. UIColor.white / UIColor.black are greyscale and not RGB.
-        // If you don't do this then you will crash when accessing components index 2 below when evaluating greyscale colors.
         let RGBCGColor = originalCGColor.converted(to: CGColorSpaceCreateDeviceRGB(), intent: .defaultIntent, options: nil)
-        guard let components = RGBCGColor?.components else {
-            return nil
-        }
-        guard components.count >= 3 else {
-            return nil
-        }
-
+        guard let components = RGBCGColor?.components else { return nil }
+        guard components.count >= 3 else { return nil }
         let brightness = Float(((components[0] * 299) + (components[1] * 587) + (components[2] * 114)) / 1000)
         return (brightness > threshold)
     }
 }
 
 extension ViewController: WKScriptMessageHandler {
-  func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        
+        // Existing handlers
         if message.name == "print" {
             printView(webView: AidovaAAC.webView)
         }
@@ -272,5 +257,31 @@ extension ViewController: WKScriptMessageHandler {
         if message.name == "push-token" {
             handleFCMToken()
         }
-  }
+        
+        // StoreKit IAP handlers
+        if message.name == "iap-purchase" {
+            // JavaScript sends: window.webkit.messageHandlers['iap-purchase'].postMessage('app.aidova.aac.premium.monthly')
+            guard let productId = message.body as? String else { return }
+            Task {
+                await StoreKitManager.shared.purchase(productId: productId)
+            }
+        }
+        
+        if message.name == "iap-restore" {
+            // JavaScript sends: window.webkit.messageHandlers['iap-restore'].postMessage('')
+            Task {
+                await StoreKitManager.shared.restorePurchases()
+            }
+        }
+        
+        if message.name == "iap-get-products" {
+            // JavaScript sends: window.webkit.messageHandlers['iap-get-products'].postMessage('')
+            // Returns product list with real App Store prices
+            let productsJSON = StoreKitManager.shared.getProductsJSON()
+            let js = "window.handleStoreKitProducts('\(productsJSON.replacingOccurrences(of: "'", with: "\\'"))');"
+            DispatchQueue.main.async {
+                AidovaAAC.webView.evaluateJavaScript(js, completionHandler: nil)
+            }
+        }
+    }
 }
