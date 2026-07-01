@@ -18,6 +18,7 @@
 		595F23AE25CEFBFE0053416C /* Printer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595F23A325CEFBFE0053416C /* Printer.swift */; };
 		595F23AF25CEFBFE0053416C /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595F23A425CEFBFE0053416C /* WebView.swift */; };
 		AA1B2C3D25CEFBFE0053416C /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3E25CEFBFE0053416C /* StoreKitManager.swift */; };
+		BB2C3D4E25CEFBFE0053416C /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB2C3D4F25CEFBFE0053416C /* StoreKit.framework */; };
 		CDC0FE292388222C002C8D56 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = CDC0FE252388222B002C8D56 /* Main.storyboard */; };
 		CDC0FE2A2388222C002C8D56 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = CDC0FE272388222B002C8D56 /* LaunchScreen.storyboard */; };
 		E1E260C850014D6B34B487B0 /* Pods_AidovaAAC.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BE9D7FFB2FBE6EEBCA807B6A /* Pods_AidovaAAC.framework */; };
@@ -38,6 +39,7 @@
 		595F23A325CEFBFE0053416C /* Printer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Printer.swift; path = "Aidova AAC/Printer.swift"; sourceTree = "<group>"; };
 		595F23A425CEFBFE0053416C /* WebView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = WebView.swift; path = "Aidova AAC/WebView.swift"; sourceTree = "<group>"; };
 		AA1B2C3E25CEFBFE0053416C /* StoreKitManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = StoreKitManager.swift; path = "Aidova AAC/StoreKitManager.swift"; sourceTree = "<group>"; };
+		BB2C3D4F25CEFBFE0053416C /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		BE9D7FFB2FBE6EEBCA807B6A /* Pods_AidovaAAC.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = "Pods_AidovaAAC.framework"; sourceTree = BUILT_PRODUCTS_DIR; };
 		BEE8E5C625AE96C07F8AADED /* Pods-Aidova AAC.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Aidova AAC.debug.xcconfig"; path = "Target Support Files/Pods-Aidova AAC/Pods-Aidova AAC.debug.xcconfig"; sourceTree = "<group>"; };
 		CDC0FE262388222B002C8D56 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = "Aidova AAC/Base.lproj/Main.storyboard"; sourceTree = "<group>"; };
@@ -68,6 +70,7 @@
 		90E46E861CB86F5FAF46BED9 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				BB2C3D4F25CEFBFE0053416C /* StoreKit.framework */,
 				BE9D7FFB2FBE6EEBCA807B6A /* Pods_AidovaAAC.framework */,
 			);
 			name = Frameworks;
