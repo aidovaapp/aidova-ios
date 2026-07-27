@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Capture Audio by user request</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Track current location by user request</string>
+	<string>Aidova uses your microphone to record your voice for communication buttons. This lets your child hear a familiar voice — such as a parent or carer — when they tap a button to communicate.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Capture Video by user request</string>
+	<string>Aidova uses your camera so you can take a photo to use as a communication button. For example, you can photograph a favourite toy, food, or person to create a personalised button for your child.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Aidova accesses your photo library so you can choose an existing photo to use as a communication button. This helps personalise the app with images your child already recognises.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -107,12 +107,13 @@
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	</array>
 	<key>UIApplicationShortcutItems</key>
-<array>
+	<array>
 		<dict>
 			<key>UIApplicationShortcutItemType</key>
 			<string>https://aidova.app/</string>
 			<key>UIApplicationShortcutItemTitle</key>
 			<string>Emergency Help</string>
-		</dict></array>
+		</dict>
+	</array>
 </dict>
 </plist>
