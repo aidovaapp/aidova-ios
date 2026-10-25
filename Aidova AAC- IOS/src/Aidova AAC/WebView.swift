@@ -49,7 +49,7 @@ func createWebView(container: UIView, WKSMH: WKScriptMessageHandler, WKND: WKNav
     let deviceModel = UIDevice.current.model
     let osVersion = UIDevice.current.systemVersion
     webView.configuration.applicationNameForUserAgent = "Safari/604.1"
-    webView.customUserAgent = "Mozilla/5.0 (\(deviceModel); CPU \(deviceModel) OS \(osVersion.replacingOccurrences(of: ".", with: "_")) like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/\(osVersion) Mobile/15E148 Safari/604.1 PWAShell"
+    webView.customUserAgent = "Mozilla/5.0 (\(deviceModel); CPU \(deviceModel) OS \(osVersion.replacingOccurrences(of: ".", with: "_")) like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/\(osVersion) Mobile/15E148 Safari/604.1 PWAShell AidovaLinks"
 
     webView.addObserver(NSO, forKeyPath: #keyPath(WKWebView.estimatedProgress), options: NSKeyValueObservingOptions.new, context: nil)
     
@@ -158,6 +158,11 @@ extension ViewController: WKUIDelegate, WKDownloadDelegate {
                     decisionHandler(.cancel)
                 }
 
+                // WhatsApp links open the WhatsApp app (or its page) outside Aidova
+                if requestHost.hasSuffix("wa.me") || requestHost.hasSuffix("whatsapp.com") {
+                    UIApplication.shared.open(requestUrl)
+                    return
+                }
                 if ["http", "https"].contains(requestUrl.scheme?.lowercased() ?? "") {
                     let safariViewController = SFSafariViewController(url: requestUrl)
                     self.present(safariViewController, animated: true, completion: nil)
@@ -168,10 +173,10 @@ extension ViewController: WKUIDelegate, WKDownloadDelegate {
                 }
             } else {
                 decisionHandler(.cancel)
-                if (navigationAction.request.url?.scheme == "tel" || navigationAction.request.url?.scheme == "mailto" ){
-                    if (UIApplication.shared.canOpenURL(requestUrl)) {
-                        UIApplication.shared.open(requestUrl)
-                    }
+                let scheme = navigationAction.request.url?.scheme?.lowercased() ?? ""
+                if (scheme == "tel" || scheme == "mailto" || scheme == "sms" || scheme == "whatsapp") {
+                    // Opens Phone, Mail, Messages or WhatsApp with the message ready to send
+                    UIApplication.shared.open(requestUrl)
                 }
                 else {
                     if requestUrl.isFileURL {
