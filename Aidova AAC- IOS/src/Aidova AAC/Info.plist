@@ -10,6 +10,14 @@
 	<string>Aidova accesses your photo library so you can choose an existing photo to use as a communication button. This helps personalise the app with images your child already recognises.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>es</string>
+		<string>hi</string>
+		<string>de</string>
+		<string>fr</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Aidova AAC</string>
 	<key>CFBundleExecutable</key>
