@@ -22,6 +22,9 @@ func createWebView(container: UIView, WKSMH: WKScriptMessageHandler, WKND: WKNav
     userContentController.add(WKSMH, name: "iap-restore")
     userContentController.add(WKSMH, name: "iap-get-products")
 
+    // Apple's own rating pop-up (asked once, at a happy moment, by app.html)
+    userContentController.add(WKSMH, name: "request-review")
+
     config.userContentController = userContentController
 
     config.limitsNavigationsToAppBoundDomains = true;

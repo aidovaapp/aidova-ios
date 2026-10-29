@@ -274,6 +274,18 @@ extension ViewController: WKScriptMessageHandler {
             }
         }
         
+        if message.name == "request-review" {
+            // JavaScript sends: window.webkit.messageHandlers['request-review'].postMessage('')
+            // Apple decides whether to show it (at most 3 times a year per person).
+            DispatchQueue.main.async {
+                let scene = self.view.window?.windowScene
+                    ?? UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+                if let scene = scene {
+                    SKStoreReviewController.requestReview(in: scene)
+                }
+            }
+        }
+
         if message.name == "iap-get-products" {
             // JavaScript sends: window.webkit.messageHandlers['iap-get-products'].postMessage('')
             // Returns product list with real App Store prices
