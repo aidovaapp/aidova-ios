@@ -25,6 +25,9 @@ func createWebView(container: UIView, WKSMH: WKScriptMessageHandler, WKND: WKNav
     // Apple's own rating pop-up (asked once, at a happy moment, by app.html)
     userContentController.add(WKSMH, name: "request-review")
 
+    // Reminders on this iPhone: timer, medicines, daily check-in (local notifications)
+    userContentController.add(WKSMH, name: "aidova-notify")
+
     config.userContentController = userContentController
 
     config.limitsNavigationsToAppBoundDomains = true;

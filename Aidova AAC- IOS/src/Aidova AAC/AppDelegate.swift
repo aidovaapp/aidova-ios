@@ -93,6 +93,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         let userInfo = notification.request.content.userInfo
 
+        // Aidova's own reminders: while Aidova is open on screen it speaks and shows them itself
+        if notification.request.identifier.hasPrefix("aidova.") {
+            completionHandler([])
+            return
+        }
+
         // With swizzling disabled you must let Messaging know about the message, for Analytics
         // Messaging.messaging().appDidReceiveMessage(userInfo)
         // Print message ID.

@@ -257,6 +257,9 @@ extension ViewController: WKScriptMessageHandler {
         if message.name == "push-token" {
             handleFCMToken()
         }
+        if message.name == "aidova-notify" {
+            handleAidovaNotify(message: message)
+        }
         
         // StoreKit IAP handlers
         if message.name == "iap-purchase" {

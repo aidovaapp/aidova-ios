@@ -1,5 +1,6 @@
 import WebKit
 import FirebaseMessaging
+import UserNotifications
 
 class SubscribeMessage {
     var topic  = ""
@@ -182,4 +183,71 @@ func sendPushClickToWebView(userInfo: [AnyHashable: Any]){
         return
     }
     checkViewAndEvaluate(event: "push-notification-click", detail: json)
+}
+
+// MARK: - Aidova reminders on this iPhone (timer, medicines, daily check-in)
+// Scheduled by the phone itself (local notifications): no server and no Firebase.
+// app.html sends JSON strings to window.webkit.messageHandlers['aidova-notify']:
+//   {"action":"permission"}  -> asks iOS (only when the person turns a reminder on); replies window.aidovaNotifyResult('granted'|'denied')
+//   {"action":"status"}      -> replies window.aidovaNotifyStatus('granted'|'denied'|'unknown')
+//   {"action":"replace","prefix":"aidova.med.","items":[{id,title,body,at(ms)|hour+minute,sound}]}
+//        removes every pending reminder whose id starts with prefix, then adds the items
+//        (items with "at" ring once at that time; items with hour/minute ring every day)
+
+func aidovaNotifyJS(_ js: String) {
+    DispatchQueue.main.async { AidovaAAC.webView?.evaluateJavaScript(js, completionHandler: nil) }
+}
+
+func handleAidovaNotify(message: WKScriptMessage) {
+    guard let s = message.body as? String, let data = s.data(using: .utf8),
+          let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+          let action = o["action"] as? String else { return }
+    let center = UNUserNotificationCenter.current()
+    switch action {
+    case "permission":
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            aidovaNotifyJS("window.aidovaNotifyResult&&window.aidovaNotifyResult('\(granted ? "granted" : "denied")')")
+        }
+    case "status":
+        center.getNotificationSettings { st in
+            var v = "unknown"
+            if st.authorizationStatus == .authorized || st.authorizationStatus == .provisional { v = "granted" }
+            if st.authorizationStatus == .denied { v = "denied" }
+            aidovaNotifyJS("window.aidovaNotifyStatus&&window.aidovaNotifyStatus('\(v)')")
+        }
+    case "replace":
+        let prefix = (o["prefix"] as? String) ?? ""
+        guard prefix.hasPrefix("aidova.") else { return }
+        let items = (o["items"] as? [[String: Any]]) ?? []
+        center.getPendingNotificationRequests { reqs in
+            let old = reqs.map { $0.identifier }.filter { $0.hasPrefix(prefix) }
+            center.removePendingNotificationRequests(withIdentifiers: old)
+            for it in items {
+                guard let id = it["id"] as? String, id.hasPrefix(prefix) else { continue }
+                let content = UNMutableNotificationContent()
+                content.title = (it["title"] as? String) ?? "Aidova"
+                content.body = (it["body"] as? String) ?? ""
+                if let snd = it["sound"] as? String, !snd.isEmpty {
+                    content.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: snd))
+                } else {
+                    content.sound = .default
+                }
+                content.userInfo = ["aidova": id]
+                let trigger: UNNotificationTrigger
+                if let at = (it["at"] as? NSNumber)?.doubleValue {
+                    let secs = at / 1000.0 - Date().timeIntervalSince1970
+                    if secs < 1 { continue }
+                    trigger = UNTimeIntervalNotificationTrigger(timeInterval: secs, repeats: false)
+                } else {
+                    var dc = DateComponents()
+                    dc.hour = (it["hour"] as? NSNumber)?.intValue ?? 9
+                    dc.minute = (it["minute"] as? NSNumber)?.intValue ?? 0
+                    trigger = UNCalendarNotificationTrigger(dateMatching: dc, repeats: true)
+                }
+                center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
+            }
+        }
+    default:
+        break
+    }
 }
