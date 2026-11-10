@@ -23,6 +23,8 @@ class StoreKitManager: NSObject, ObservableObject {
     
     var webView: WKWebView?
     var products: [Product] = []
+    // Free-trial info per product, so the page only offers "7 days free" to people who can still get it (Apple guideline 3.1.2)
+    var introInfo: [String: (eligible: Bool, days: Int)] = [:]
     var transactionListener: Task<Void, Error>?
     
     override init() {
@@ -41,6 +43,7 @@ class StoreKitManager: NSObject, ObservableObject {
             let productIds = AidovaProduct.allCases.map { $0.rawValue }
             products = try await Product.products(for: productIds)
             print("Aidova StoreKit: loaded \(products.count) products")
+            await refreshIntroInfo()
         } catch {
             print("Aidova StoreKit: failed to load products — \(error)")
         }
@@ -166,16 +169,40 @@ class StoreKitManager: NSObject, ObservableObject {
         }
     }
     
+    // MARK: — Free trial: is there one, and can this person still use it?
+    // Apple gives one introductory offer per subscription group, so after a trial has been used it is no longer offered.
+    func refreshIntroInfo() async {
+        var info: [String: (eligible: Bool, days: Int)] = [:]
+        for p in products {
+            guard let sub = p.subscription, let offer = sub.introductoryOffer, offer.paymentMode == .freeTrial else { continue }
+            let eligible = await sub.isEligibleForIntroOffer
+            var days = offer.period.value
+            switch offer.period.unit {
+            case .week: days = offer.period.value * 7
+            case .month: days = offer.period.value * 30
+            case .year: days = offer.period.value * 365
+            default: break
+            }
+            info[p.id] = (eligible, days)
+        }
+        introInfo = info
+    }
+
     // MARK: — Get available products as JSON for JavaScript
     func getProductsJSON() -> String {
         var arr: [[String: String]] = []
         for p in products {
-            arr.append([
+            var item: [String: String] = [
                 "id": p.id,
                 "displayName": p.displayName,
                 "description": p.description,
                 "displayPrice": p.displayPrice
-            ])
+            ]
+            if let intro = introInfo[p.id] {
+                item["trialDays"] = String(intro.days)
+                item["trialEligible"] = intro.eligible ? "1" : "0"
+            }
+            arr.append(item)
         }
         if let data = try? JSONSerialization.data(withJSONObject: arr),
            let str = String(data: data, encoding: .utf8) {

@@ -292,10 +292,14 @@ extension ViewController: WKScriptMessageHandler {
         if message.name == "iap-get-products" {
             // JavaScript sends: window.webkit.messageHandlers['iap-get-products'].postMessage('')
             // Returns product list with real App Store prices
-            let productsJSON = StoreKitManager.shared.getProductsJSON()
-            let js = "window.handleStoreKitProducts('\(productsJSON.replacingOccurrences(of: "'", with: "\\'"))');"
-            DispatchQueue.main.async {
-                AidovaAAC.webView.evaluateJavaScript(js, completionHandler: nil)
+            // Re-checks free-trial eligibility first, so it is right after a purchase or restore
+            Task {
+                await StoreKitManager.shared.refreshIntroInfo()
+                let productsJSON = StoreKitManager.shared.getProductsJSON()
+                let js = "window.handleStoreKitProducts('\(productsJSON.replacingOccurrences(of: "'", with: "\\'"))');"
+                DispatchQueue.main.async {
+                    AidovaAAC.webView.evaluateJavaScript(js, completionHandler: nil)
+                }
             }
         }
     }
