@@ -260,6 +260,15 @@ extension ViewController: WKScriptMessageHandler {
         if message.name == "aidova-notify" {
             handleAidovaNotify(message: message)
         }
+        if message.name == "aidova-speak" {
+            handleNativeSpeak(message: message)
+        }
+        if message.name == "aidova-speak-stop" {
+            NativeSpeech.shared.stop()
+        }
+        if message.name == "aidova-voices" {
+            handleNativeVoices()
+        }
         
         // StoreKit IAP handlers
         if message.name == "iap-purchase" {
