@@ -28,6 +28,11 @@ func createWebView(container: UIView, WKSMH: WKScriptMessageHandler, WKND: WKNav
     // Reminders on this iPhone: timer, medicines, daily check-in (local notifications)
     userContentController.add(WKSMH, name: "aidova-notify")
 
+    // Speech for languages the web view cannot list (Gujarati on iPhone)
+    userContentController.add(WKSMH, name: "aidova-speak")
+    userContentController.add(WKSMH, name: "aidova-speak-stop")
+    userContentController.add(WKSMH, name: "aidova-voices")
+
     config.userContentController = userContentController
 
     config.limitsNavigationsToAppBoundDomains = true;
